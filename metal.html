@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>METAL</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #020408;
+  --green: #00FF88;
+  --red: #FF2244;
+  --yellow: #FFD600;
+  --orange: #FF6D00;
+  --mono: 'Share Tech Mono', monospace;
+}
+html, body { width:100%; height:100%; background:#000; font-family:var(--mono); overflow:hidden; }
+
+/* KAMERA */
+#video {
+  position:fixed; inset:0; z-index:0;
+  width:100%; height:100%;
+  object-fit:cover;
+  filter:brightness(0.6) saturate(0.8);
+}
+
+/* AR CANVAS */
+#arCanvas { position:fixed; inset:0; z-index:2; pointer-events:none; }
+
+/* HEADER */
+.hdr {
+  position:fixed; top:0; left:0; right:0;
+  padding:44px 16px 10px; z-index:10;
+  background:linear-gradient(180deg,rgba(0,0,0,0.9) 0%,transparent 100%);
+  display:flex; align-items:flex-start; justify-content:space-between;
+  pointer-events:all;
+}
+.brand { font-size:18px; letter-spacing:5px; color:var(--green); text-shadow:0 0 14px var(--green); }
+.brand-sub { font-size:7px; color:rgba(0,255,136,0.3); letter-spacing:2px; margin-top:2px; }
+.hdr-r { text-align:right; display:flex; flex-direction:column; gap:2px; }
+.hl { font-size:8px; color:rgba(0,255,136,0.35); letter-spacing:1px; }
+.hl b { color:var(--green); }
+
+/* BÜYÜK METRE GÖSTERGESİ */
+.meter-wrap {
+  position:fixed; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  z-index:10; text-align:center;
+  pointer-events:none;
+}
+
+.meter-ring {
+  width:180px; height:180px;
+  position:relative; margin:0 auto 8px;
+}
+
+.meter-ring svg { width:100%; height:100%; }
+
+.meter-val {
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  font-size:36px; font-weight:900;
+  color:var(--green);
+  text-shadow:0 0 20px var(--green);
+  transition:all 0.2s;
+  line-height:1;
+}
+
+.meter-unit {
+  font-size:10px; color:rgba(0,255,136,0.4);
+  letter-spacing:2px; margin-top:2px;
+}
+
+.meter-label {
+  font-size:11px; letter-spacing:3px;
+  color:rgba(0,255,136,0.5);
+  transition:all 0.3s;
+}
+
+/* METAL ALGILANDI */
+.metal-alert {
+  position:fixed; inset:0; z-index:15;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  pointer-events:none; opacity:0;
+  transition:opacity 0.2s;
+}
+
+.metal-alert.show { opacity:1; }
+
+.ma-bg { position:absolute; inset:0; background:rgba(255,214,0,0.06); animation:maf 0.4s infinite; }
+@keyframes maf { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.ma-text {
+  position:relative; z-index:2;
+  font-size:28px; letter-spacing:4px;
+  color:var(--yellow);
+  text-shadow:0 0 24px var(--yellow);
+  animation:maf 0.4s infinite;
+}
+
+.ma-sub {
+  position:relative; z-index:2;
+  font-size:12px; letter-spacing:3px;
+  color:rgba(255,214,0,0.6);
+  margin-top:6px;
+}
+
+/* BORDER FLASH */
+.bfl {
+  position:fixed; z-index:14;
+  pointer-events:none; opacity:0;
+  transition:opacity 0.2s;
+}
+.bfl.show { opacity:1; animation:bfp 0.3s infinite; }
+@keyframes bfp { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* HEDEF NIŞAN */
+.crosshair {
+  position:fixed; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  z-index:8; pointer-events:none;
+  width:120px; height:120px;
+}
+
+/* ALT */
+.bottom {
+  position:fixed; bottom:0; left:0; right:0;
+  padding:0 14px 26px; z-index:10;
+  background:linear-gradient(0deg,rgba(0,0,0,0.95) 0%,transparent 100%);
+  pointer-events:all;
+}
+
+/* METRİK BAR */
+.metric-bar-wrap {
+  display:flex; align-items:center; gap:8px; margin-bottom:8px;
+}
+.mb-label { font-size:8px; letter-spacing:1px; color:rgba(0,255,136,0.3); width:50px; }
+.mb-track {
+  flex:1; height:6px;
+  background:rgba(0,255,136,0.08); border-radius:3px; overflow:hidden;
+}
+.mb-fill { height:100%; border-radius:3px; transition:width 0.1s ease; }
+.mb-val { font-size:10px; color:var(--green); width:45px; text-align:right; }
+
+.stat-row { display:flex; gap:5px; margin-bottom:6px; }
+.sc {
+  flex:1; padding:6px 3px;
+  border:1px solid rgba(0,255,136,0.1); border-radius:7px;
+  background:rgba(0,0,0,0.6);
+  display:flex; flex-direction:column; align-items:center; gap:1px;
+}
+.sc-l { font-size:7px; letter-spacing:1px; color:rgba(0,255,136,0.3); }
+.sc-v { font-size:12px; font-weight:700; color:var(--green); line-height:1; }
+
+.log { height:24px; overflow:hidden; margin-bottom:6px; }
+.ll { font-size:9px; color:rgba(0,255,136,0.35); letter-spacing:0.5px; line-height:1.7; }
+.ll.a { color:var(--yellow); } .ll.w { color:var(--orange); } .ll.ok { color:var(--green); }
+
+.btn-row { display:flex; gap:6px; }
+.bm {
+  flex:2; padding:13px;
+  border:1px solid rgba(0,255,136,0.35); border-radius:9px;
+  background:rgba(0,0,0,0.6); color:var(--green);
+  font-family:var(--mono); font-size:11px; letter-spacing:2px; cursor:pointer;
+  text-shadow:0 0 8px var(--green); transition:all 0.2s;
+}
+.bm.active { background:rgba(0,255,136,0.1); border-color:var(--green); }
+.bs {
+  flex:1; padding:13px 4px;
+  border:1px solid rgba(255,214,0,0.2); border-radius:9px;
+  background:rgba(0,0,0,0.6); color:rgba(255,214,0,0.5);
+  font-family:var(--mono); font-size:8px; letter-spacing:1px; cursor:pointer;
+}
+.bs.active { border-color:var(--yellow); color:var(--yellow); }
+
+/* İZİN */
+#perm {
+  position:fixed; inset:0; z-index:100; background:var(--bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:14px; padding:40px 32px;
+}
+.pi { font-size:50px; }
+.pt { font-size:18px; letter-spacing:6px; color:var(--green); text-shadow:0 0 14px var(--green); }
+.pd { font-size:12px; color:rgba(255,255,255,0.3); text-align:center; line-height:1.8; max-width:270px; }
+.pw { font-size:9px; color:rgba(255,214,0,0.4); text-align:center; line-height:1.7; max-width:270px; }
+.pb {
+  width:100%; max-width:270px; padding:15px;
+  border:1px solid var(--green); border-radius:11px;
+  background:rgba(0,255,136,0.07); color:var(--green);
+  font-family:var(--mono); font-size:13px; letter-spacing:3px; cursor:pointer;
+  text-shadow:0 0 10px var(--green);
+}
+
+/* Hassasiyet göstergesi */
+.sens-dots {
+  position:fixed; top:50%; right:16px;
+  transform:translateY(-50%);
+  z-index:10; display:flex; flex-direction:column; gap:4px;
+  pointer-events:none;
+}
+.sd {
+  width:6px; height:6px; border-radius:50%;
+  background:rgba(0,255,136,0.15);
+  transition:all 0.2s;
+}
+.sd.on { background:var(--green); box-shadow:0 0 6px var(--green); }
+.sd.warn { background:var(--yellow); box-shadow:0 0 6px var(--yellow); }
+.sd.alert { background:var(--red); box-shadow:0 0 6px var(--red); }
+</style>
+</head>
+<body>
+
+<div id="perm">
+  <div class="pi">🔍</div>
+  <div class="pt">METAL</div>
+  <div class="pd">Manyetometre + Kamera AR ile metal tespiti. Telefonu yavaşça zemine doğru tut.</div>
+  <div class="pw">⚠ Büyük demir/çelik nesneler · 5-20cm mesafe · Telefonu sabit tut</div>
+  <button class="pb" onclick="init()">[ AKTİF ET ]</button>
+</div>
+
+<video id="video" autoplay playsinline muted></video>
+<canvas id="arCanvas"></canvas>
+
+<!-- AR HEDEF -->
+<svg class="crosshair" viewBox="0 0 120 120" id="crosshairSvg">
+  <circle cx="60" cy="60" r="55" fill="none" stroke="rgba(0,255,136,0.15)" stroke-width="0.5"/>
+  <circle cx="60" cy="60" r="40" fill="none" stroke="rgba(0,255,136,0.2)" stroke-width="0.5" stroke-dasharray="4 8"/>
+  <circle cx="60" cy="60" r="20" fill="none" stroke="rgba(0,255,136,0.3)" stroke-width="1" id="innerRing"/>
+  <line x1="60" y1="5" x2="60" y2="40" stroke="rgba(0,255,136,0.3)" stroke-width="0.5"/>
+  <line x1="60" y1="80" x2="60" y2="115" stroke="rgba(0,255,136,0.3)" stroke-width="0.5"/>
+  <line x1="5" y1="60" x2="40" y2="60" stroke="rgba(0,255,136,0.3)" stroke-width="0.5"/>
+  <line x1="80" y1="60" x2="115" y2="60" stroke="rgba(0,255,136,0.3)" stroke-width="0.5"/>
+  <circle cx="60" cy="60" r="2" fill="rgba(0,255,136,0.5)"/>
+</svg>
+
+<!-- METAL ALGILANDI -->
+<div class="metal-alert" id="metalAlert">
+  <div class="ma-bg"></div>
+  <div class="ma-text">⚡ METAL TESPİT</div>
+  <div class="ma-sub" id="maType">DEMİR/ÇELİK</div>
+</div>
+
+<!-- BORDER -->
+<div class="bfl" id="bTop" style="top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--yellow),transparent)"></div>
+<div class="bfl" id="bBot" style="bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--yellow),transparent)"></div>
+<div class="bfl" id="bLeft" style="top:0;bottom:0;left:0;width:3px;background:linear-gradient(180deg,transparent,var(--yellow),transparent)"></div>
+<div class="bfl" id="bRight" style="top:0;bottom:0;right:0;width:3px;background:linear-gradient(180deg,transparent,var(--yellow),transparent)"></div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <div class="brand">METAL</div>
+    <div class="brand-sub">MANYETOMETRİK TESPİT · AR</div>
+  </div>
+  <div class="hdr-r">
+    <div class="hl">DURUM: <b id="stTxt">HAZIR</b></div>
+    <div class="hl">TESPİT: <b id="detTxt">0</b></div>
+    <div class="hl">BÖLGE: <b id="zoneTxt">--</b></div>
+  </div>
+</div>
+
+<!-- METRE GÖSTERGESİ -->
+<div class="meter-wrap" id="meterWrap">
+  <div class="meter-ring">
+    <svg viewBox="0 0 180 180" id="meterSvg">
+      <!-- Arka plan arc -->
+      <circle cx="90" cy="90" r="75" fill="none" stroke="rgba(0,255,136,0.06)" stroke-width="8"/>
+      <!-- Değer arc -->
+      <circle cx="90" cy="90" r="75" fill="none" id="meterArc"
+        stroke="var(--green)" stroke-width="8"
+        stroke-dasharray="0 471"
+        stroke-dashoffset="118"
+        stroke-linecap="round"
+        transform="rotate(-90 90 90)"
+        style="transition:all 0.15s ease"/>
+      <!-- İşaretler -->
+      <text x="90" y="30" text-anchor="middle" fill="rgba(0,255,136,0.2)" font-size="8" font-family="Share Tech Mono">MAX</text>
+    </svg>
+    <div class="meter-val" id="meterVal">0</div>
+  </div>
+  <div class="meter-unit">µT SAPMA</div>
+  <div class="meter-label" id="meterLabel">KALİBRE BEKLE</div>
+</div>
+
+<!-- HASSASİYET NOKTALAR -->
+<div class="sens-dots" id="sensDots"></div>
+
+<!-- ALT -->
+<div class="bottom">
+  <div class="metric-bar-wrap">
+    <div class="mb-label">X EKSENİ</div>
+    <div class="mb-track"><div class="mb-fill" id="xBar" style="width:50%;background:var(--green)"></div></div>
+    <div class="mb-val" id="xVal">0.0</div>
+  </div>
+  <div class="metric-bar-wrap">
+    <div class="mb-label">Y EKSENİ</div>
+    <div class="mb-track"><div class="mb-fill" id="yBar" style="width:50%;background:var(--green)"></div></div>
+    <div class="mb-val" id="yVal">0.0</div>
+  </div>
+  <div class="metric-bar-wrap">
+    <div class="mb-label">Z EKSENİ</div>
+    <div class="mb-track"><div class="mb-fill" id="zBar" style="width:50%;background:var(--green)"></div></div>
+    <div class="mb-val" id="zVal">0.0</div>
+  </div>
+
+  <div class="stat-row">
+    <div class="sc"><div class="sc-l">TOPLAM</div><div class="sc-v" id="totalVal">0.0</div></div>
+    <div class="sc"><div class="sc-l">SAPMA</div><div class="sc-v" id="devVal" style="color:var(--yellow)">0.0</div></div>
+    <div class="sc"><div class="sc-l">EN YÜKSEK</div><div class="sc-v" id="peakVal" style="color:var(--red)">0.0</div></div>
+    <div class="sc"><div class="sc-l">EŞİK</div><div class="sc-v" id="threshVal">5.0</div></div>
+  </div>
+
+  <div class="log" id="logEl"><div class="ll ok">[ SİSTEM HAZIR ]</div></div>
+
+  <div class="btn-row">
+    <button class="bm" id="mainBtn" onclick="toggleDetect()">[ TARAMAY BAŞLAT ]</button>
+    <button class="bs" onclick="calibrate()">KALİBRE</button>
+    <button class="bs" id="sensBtn" onclick="cycleSens()">EŞİK</button>
+    <button class="bs" id="sndBtn" onclick="toggleSound()">SES:OFF</button>
+  </div>
+</div>
+
+<script>
+const W = window.innerWidth, H = window.innerHeight;
+const arC = document.getElementById('arCanvas');
+arC.width = W; arC.height = H;
+const arX = arC.getContext('2d');
+
+// STATE
+let active = false, calibrating = false;
+let baseline = null, peak = 0, detCount = 0;
+let soundOn = false, audioCtx;
+let t = 0, alertCD = 0;
+
+// Sensör verisi
+let mag = {x:0, y:0, z:0};
+let magHistory = [];
+const HIST = 50;
+
+// Kalman filtresi için
+let kalmanState = {x:0, y:0, z:0};
+const KALMAN_Q = 0.1, KALMAN_R = 2.0;
+let kalmanP = {x:1, y:1, z:1};
+
+// Eşik seviyeleri
+const THRESH_LEVELS = [2, 5, 10, 20, 35];
+let threshIdx = 1;
+
+// Sens noktaları
+function updateSensDots(val) {
+  const el = document.getElementById('sensDots');
+  el.innerHTML = '';
+  for(let i=0; i<10; i++){
+    const d = document.createElement('div');
+    d.className = 'sd';
+    const pct = val / 100;
+    if(i < pct*10){
+      d.classList.add(pct<0.4?'on':pct<0.7?'warn':'alert');
+    }
+    el.appendChild(d);
+  }
+}
+
+// ── INIT ──
+async function init() {
+  document.getElementById('perm').style.display = 'none';
+
+  // Kamera
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}
+    });
+    document.getElementById('video').srcObject = stream;
+    addLog('KAMERA AKTİF','ok');
+  } catch(e) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({video:true});
+      document.getElementById('video').srcObject = stream;
+    } catch(e2) { addLog('KAMERA YÜKLENMEDI','w'); }
+  }
+
+  // Audio
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+
+  // Manyetometre
+  if(window.DeviceOrientationEvent && 'AbsoluteOrientationSensor' in window) {
+    try {
+      const sensor = new AbsoluteOrientationSensor({frequency:100});
+      sensor.start();
+      addLog('SENSOR AKTİF','ok');
+    } catch(e) {}
+  }
+
+  if(window.DeviceOrientationEvent) {
+    window.addEventListener('deviceorientationabsolute', onOrientation, {passive:true});
+    window.addEventListener('deviceorientation', onOrientation, {passive:true});
+  }
+
+  // Manyetometre direkt
+  if('Magnetometer' in window) {
+    try {
+      const sensor = new Magnetometer({frequency:100});
+      sensor.addEventListener('reading', ()=>{
+        mag = {x:sensor.x||0, y:sensor.y||0, z:sensor.z||0};
+      });
+      sensor.start();
+      addLog('MANYETOMETRİ AKTİF','ok');
+      document.getElementById('stTxt').textContent = 'AKTİF';
+    } catch(e) {
+      addLog('MANYETOMETRİ: '+e.message,'w');
+      useFallback();
+    }
+  } else {
+    addLog('DOLAYLI MOD AKTİF','w');
+    useFallback();
+  }
+
+  arLoop();
+}
+
+function useFallback() {
+  // DeviceOrientation fallback - manyetik başlık kullan
+  addLog('ORYANTASYON SENSÖRÜ KULLANILIYOR','w');
+  document.getElementById('stTxt').textContent = 'DOLAYLIMOD';
+}
+
+let lastAlpha = 0, lastBeta = 0, lastGamma = 0;
+function onOrientation(e) {
+  if(e.webkitCompassHeading !== undefined) {
+    // iOS
+    const heading = e.webkitCompassHeading || 0;
+    const accuracy = e.webkitCompassAccuracy || 0;
+    mag.x = Math.cos(heading * Math.PI/180) * 50;
+    mag.y = Math.sin(heading * Math.PI/180) * 50;
+    mag.z = (e.beta||0) * 0.5;
+  } else {
+    mag.x = (e.alpha||0) * 0.3;
+    mag.y = (e.beta||0) * 0.5;
+    mag.z = (e.gamma||0) * 0.4;
+  }
+}
+
+// Kalman filtresi
+function kalmanFilter(measured) {
+  const axes = ['x','y','z'];
+  const filtered = {};
+  axes.forEach(a => {
+    // Predict
+    const pPred = kalmanP[a] + KALMAN_Q;
+    // Update
+    const K = pPred / (pPred + KALMAN_R);
+    kalmanState[a] = kalmanState[a] + K * (measured[a] - kalmanState[a]);
+    kalmanP[a] = (1-K) * pPred;
+    filtered[a] = kalmanState[a];
+  });
+  return filtered;
+}
+
+// ── TOGGLE ──
+function toggleDetect() {
+  active = !active;
+  const btn = document.getElementById('mainBtn');
+  if(active){
+    btn.classList.add('active');
+    btn.textContent = '[ TARAMA AKTİF · DUR ]';
+    document.getElementById('stTxt').textContent = 'TARAMA';
+    addLog('TARAMA BAŞLADI','ok');
+    if(!baseline) setTimeout(calibrate, 1000);
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '[ TARAMAYI BAŞLAT ]';
+    document.getElementById('stTxt').textContent = 'DURAKLATILDI';
+    peak = 0;
+    addLog('TARAMA DURDURULDU','w');
+  }
+}
+
+function calibrate() {
+  if(calibrating) return;
+  calibrating = true;
+  const samples = [];
+  addLog('KALİBRASYON: SABİT TUT...','w');
+  document.getElementById('meterLabel').textContent = 'KALİBRASYON...';
+  let cnt = 0;
+  const iv = setInterval(()=>{
+    const f = kalmanFilter(mag);
+    const total = Math.sqrt(f.x**2 + f.y**2 + f.z**2);
+    samples.push({x:f.x, y:f.y, z:f.z, total});
+    if(++cnt >= 50){
+      clearInterval(iv);
+      baseline = {
+        x: samples.reduce((a,b)=>a+b.x,0)/samples.length,
+        y: samples.reduce((a,b)=>a+b.y,0)/samples.length,
+        z: samples.reduce((a,b)=>a+b.z,0)/samples.length,
+        total: samples.reduce((a,b)=>a+b.total,0)/samples.length,
+      };
+      calibrating = false;
+      addLog(`TAMAM · BAZA:${baseline.total.toFixed(1)}µT`,'ok');
+      document.getElementById('meterLabel').textContent = 'METAL ARA';
+    }
+  }, 40);
+}
+
+function cycleSens() {
+  threshIdx = (threshIdx+1) % THRESH_LEVELS.length;
+  document.getElementById('threshVal').textContent = THRESH_LEVELS[threshIdx].toFixed(0);
+  addLog(`EŞİK: ${THRESH_LEVELS[threshIdx]}µT`,'w');
+}
+
+function toggleSound() {
+  soundOn = !soundOn;
+  const btn = document.getElementById('sndBtn');
+  btn.textContent = soundOn?'SES:ON':'SES:OFF';
+  btn.classList.toggle('active', soundOn);
+}
+
+function playBeep(freq, dur) {
+  if(!soundOn||!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.frequency.value = freq;
+  osc.type = 'sine';
+  g.gain.value = 0.2;
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.start();
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur/1000);
+  osc.stop(audioCtx.currentTime + dur/1000);
+}
+
+function addLog(msg, type='ok') {
+  const el = document.getElementById('logEl');
+  const l = document.createElement('div');
+  l.className = 'll '+type;
+  const tm = new Date().toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  l.textContent = `[${tm}] ${msg}`;
+  el.insertBefore(l, el.firstChild);
+  while(el.children.length > 2) el.removeChild(el.lastChild);
+}
+
+// ── ANA DÖNGÜ ──
+let arAnimId;
+function arLoop() {
+  t++;
+  arX.clearRect(0,0,W,H);
+
+  const filtered = kalmanFilter(mag);
+  const total = Math.sqrt(filtered.x**2 + filtered.y**2 + filtered.z**2);
+
+  let dev = 0;
+  if(baseline) {
+    dev = Math.abs(total - baseline.total);
+    // Eksen sapmaları
+    const dx = Math.abs(filtered.x - baseline.x);
+    const dy = Math.abs(filtered.y - baseline.y);
+    const dz = Math.abs(filtered.z - baseline.z);
+    dev = Math.max(dev, Math.sqrt(dx**2 + dy**2 + dz**2) * 0.5);
+  }
+
+  if(dev > peak) peak = dev;
+
+  // Geçmiş
+  magHistory.push(dev);
+  if(magHistory.length > HIST) magHistory.shift();
+
+  // UI güncelle
+  const thresh = THRESH_LEVELS[threshIdx];
+  const pct = Math.min(100, (dev/thresh)*80);
+  updateSensDots(pct);
+
+  // Metre arc
+  const circumference = 2 * Math.PI * 75;
+  const arcVal = Math.min(circumference * 0.75, (dev/Math.max(thresh*2,1)) * circumference * 0.75);
+  document.getElementById('meterArc').style.strokeDasharray = `${arcVal} ${circumference}`;
+
+  const mVal = document.getElementById('meterVal');
+  mVal.textContent = dev.toFixed(1);
+
+  // Renk
+  let color = '#00FF88';
+  if(dev > thresh * 2) color = '#FF2244';
+  else if(dev > thresh) color = '#FFD600';
+  else if(dev > thresh * 0.5) color = '#FF6D00';
+
+  document.getElementById('meterArc').setAttribute('stroke', color);
+  mVal.style.color = color;
+  mVal.style.textShadow = `0 0 20px ${color}`;
+
+  // Eksen barlar
+  ['x','y','z'].forEach(a => {
+    const v = filtered[a];
+    const base = baseline ? baseline[a] : 0;
+    const d = Math.abs(v - base);
+    const pct2 = Math.min(100, 50 + (v/100)*50);
+    document.getElementById(a+'Bar').style.width = pct2+'%';
+    document.getElementById(a+'Bar').style.background = d > thresh*0.3 ? '#FFD600' : '#00FF88';
+    document.getElementById(a+'Val').textContent = v.toFixed(1);
+  });
+
+  document.getElementById('totalVal').textContent = total.toFixed(1);
+  document.getElementById('devVal').textContent = dev.toFixed(2);
+  document.getElementById('peakVal').textContent = peak.toFixed(1);
+
+  // Etiket
+  if(!baseline) {
+    document.getElementById('meterLabel').textContent = 'KALİBRE BEKLE';
+  } else if(dev > thresh * 2) {
+    document.getElementById('meterLabel').textContent = '⚡ METAL TESPİT!';
+    document.getElementById('zoneTxt').textContent = 'AKTİF';
+  } else if(dev > thresh) {
+    document.getElementById('meterLabel').textContent = '⚠ YAKLAŞIYOR';
+    document.getElementById('zoneTxt').textContent = 'UYARI';
+  } else if(dev > thresh * 0.5) {
+    document.getElementById('meterLabel').textContent = 'SINIRDA';
+    document.getElementById('zoneTxt').textContent = 'NORMAL';
+  } else {
+    document.getElementById('meterLabel').textContent = 'METAL ARA';
+    document.getElementById('zoneTxt').textContent = '--';
+  }
+
+  // AR efektler
+  if(active && baseline) {
+    drawAREffects(dev, thresh, color);
+
+    // ALARM
+    if(dev > thresh && alertCD <= 0) {
+      triggerAlert(dev, thresh);
+      alertCD = 15;
+      detCount++;
+      document.getElementById('detTxt').textContent = detCount;
+
+      // Ses - mesafeye göre frekans
+      const freq = 400 + (dev/thresh) * 400;
+      playBeep(freq, 150);
+    }
+
+    // Sürekli bip (yakınlığa göre hız)
+    if(dev > thresh * 0.5 && t % Math.max(2, Math.floor(20 - dev/thresh*3)) === 0) {
+      playBeep(300 + dev*10, 50);
+    }
+  }
+
+  if(alertCD > 0) {
+    alertCD--;
+    if(alertCD === 0) {
+      document.getElementById('metalAlert').classList.remove('show');
+      ['bTop','bBot','bLeft','bRight'].forEach(id=>document.getElementById(id).classList.remove('show'));
+    }
+  }
+
+  requestAnimationFrame(arLoop);
+}
+
+function drawAREffects(dev, thresh, color) {
+  const cx = W/2, cy = H/2;
+  const intensity = Math.min(1, dev/thresh);
+
+  // Tarama çizgileri
+  for(let i=0; i<3; i++) {
+    const phase = ((t*0.015) + i*0.33) % 1;
+    const r = phase * Math.min(W,H)*0.45;
+    arX.beginPath();
+    arX.arc(cx,cy,r,0,Math.PI*2);
+    arX.strokeStyle = `rgba(${intensity>0.5?'255,214,0':'0,255,136'},${(1-phase)*intensity*0.3})`;
+    arX.lineWidth = 1;
+    arX.stroke();
+  }
+
+  // Nişan rengi güncelle
+  const innerRing = document.getElementById('innerRing');
+  innerRing.setAttribute('stroke', color.replace('#','rgba(').replace(/(\w{2})(\w{2})(\w{2})/,
+    (m,r,g,b)=>`rgba(${parseInt(r,16)},${parseInt(g,16)},${parseInt(b,16)},${0.3+intensity*0.5})`));
+
+  // Metal tespit noktası (sahte AR - zemin ortası)
+  if(dev > thresh * 0.7) {
+    const pulseR = 20 + intensity*30;
+    const pulse = Math.sin(t*0.2)*0.3+0.7;
+
+    arX.beginPath();
+    arX.arc(cx, cy+40, pulseR, 0, Math.PI*2);
+    const g2 = arX.createRadialGradient(cx,cy+40,0,cx,cy+40,pulseR);
+    g2.addColorStop(0, `rgba(255,214,0,${intensity*pulse*0.6})`);
+    g2.addColorStop(1, 'rgba(255,214,0,0)');
+    arX.fillStyle = g2;
+    arX.fill();
+
+    // AR etiket
+    arX.fillStyle = `rgba(255,214,0,${intensity})`;
+    arX.font = `700 10px Share Tech Mono`;
+    arX.textAlign = 'center';
+    arX.fillText(`${dev.toFixed(1)}µT`, cx, cy+40+pulseR+15);
+    arX.textAlign = 'left';
+  }
+
+  // Geçmiş grafik (AR)
+  if(magHistory.length > 10) {
+    arX.beginPath();
+    const startX = 16, endX = W-16;
+    const gW = endX - startX;
+    magHistory.forEach((v,i) => {
+      const x = startX + (i/HIST)*gW;
+      const h2 = Math.min(30, (v/thresh)*30);
+      const y = H*0.15 - h2;
+      if(i===0) arX.moveTo(x,y); else arX.lineTo(x,y);
+    });
+    arX.strokeStyle = `rgba(0,255,136,0.3)`;
+    arX.lineWidth = 1;
+    arX.stroke();
+  }
+}
+
+function triggerAlert(dev, thresh) {
+  const intensity = dev/thresh;
+  const type = intensity > 3 ? 'GÜÇLÜ DEMİR/ÇELİK' : intensity > 2 ? 'DEMİR/ÇELİK' : 'KÜÇÜK METAL';
+  document.getElementById('maType').textContent = type + ` · ${dev.toFixed(1)}µT`;
+  document.getElementById('metalAlert').classList.add('show');
+  ['bTop','bBot','bLeft','bRight'].forEach(id=>document.getElementById(id).classList.add('show'));
+  if(navigator.vibrate) navigator.vibrate([100,50,100]);
+}
+
+// init değil, perm düğmesine bağlı
+</script>
+</body>
+</html>
