@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SONAR</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Space+Grotesk:wght@700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #020408;
+  --green: #00FF88;
+  --cyan: #00D4FF;
+  --red: #FF2244;
+  --yellow: #FFD600;
+  --orange: #FF6D00;
+  --mono: 'Share Tech Mono', monospace;
+}
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  font-family: 'Space Grotesk', sans-serif;
+  overflow: hidden;
+}
+canvas { position: fixed; inset: 0; z-index: 0; }
+#uiCanvas { z-index: 1; }
+
+/* ALERT OVERLAY */
+#alertOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+#alertOverlay.show { display: flex; }
+
+.alert-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,34,68,0.08);
+  animation: alertFlash 0.5s infinite;
+}
+
+@keyframes alertFlash {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.alert-main {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: rgba(255,34,68,0.7);
+}
+
+.alert-direction {
+  font-family: var(--mono);
+  font-size: 42px;
+  font-weight: 800;
+  color: var(--red);
+  text-shadow: 0 0 30px var(--red);
+  letter-spacing: 2px;
+  line-height: 1;
+}
+
+.alert-size {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: rgba(255,34,68,0.8);
+}
+
+.alert-meter {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: rgba(255,214,0,0.7);
+}
+
+/* BORDER ALERT */
+.border-alert {
+  position: fixed;
+  z-index: 15;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.border-alert.show { opacity: 1; }
+
+.ba-top, .ba-bottom {
+  left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, var(--red), transparent);
+}
+.ba-top { top: 0; }
+.ba-bottom { bottom: 0; }
+
+.ba-left, .ba-right {
+  top: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, transparent, var(--red), transparent);
+}
+.ba-left { left: 0; }
+.ba-right { right: 0; }
+
+/* HEADER */
+.hdr {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  padding: 48px 18px 12px;
+  z-index: 10;
+  background: linear-gradient(180deg, rgba(2,4,8,0.97) 0%, transparent 100%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: all;
+}
+
+.brand {
+  font-family: var(--mono);
+  font-size: 20px;
+  letter-spacing: 5px;
+  color: var(--green);
+  text-shadow: 0 0 16px var(--green);
+  line-height: 1;
+}
+
+.brand-sub {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: rgba(0,255,136,0.3);
+  letter-spacing: 2px;
+  margin-top: 3px;
+}
+
+.hdr-stats {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hdr-line {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: rgba(0,255,136,0.35);
+  letter-spacing: 1px;
+}
+
+.hdr-line b { color: var(--green); }
+
+/* BOTTOM */
+.bottom {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  padding: 0 16px 28px;
+  z-index: 10;
+  background: linear-gradient(0deg, rgba(2,4,8,0.98) 0%, transparent 100%);
+  pointer-events: all;
+}
+
+/* STATUS BAR */
+.status-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.stat-chip {
+  flex: 1;
+  padding: 7px 4px;
+  border: 1px solid rgba(0,255,136,0.1);
+  border-radius: 8px;
+  background: rgba(0,255,136,0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.sc-label {
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: rgba(0,255,136,0.3);
+}
+
+.sc-val {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--green);
+  line-height: 1;
+}
+
+/* LOG */
+.log {
+  height: 28px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.log-line {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: rgba(0,255,136,0.4);
+  letter-spacing: 0.5px;
+  line-height: 1.7;
+}
+
+.log-line.alert { color: var(--red); font-size: 10px; }
+.log-line.warn { color: var(--yellow); }
+.log-line.ok { color: var(--green); }
+
+/* BUTONLAR */
+.btn-row { display: flex; gap: 8px; }
+
+.btn-main {
+  flex: 2;
+  padding: 15px;
+  border: 1px solid rgba(0,255,136,0.35);
+  border-radius: 10px;
+  background: rgba(0,255,136,0.04);
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  text-shadow: 0 0 8px var(--green);
+  transition: all 0.2s;
+}
+
+.btn-main.active {
+  background: rgba(0,255,136,0.1);
+  border-color: var(--green);
+  box-shadow: 0 0 20px rgba(0,255,136,0.1);
+}
+
+.btn-sm {
+  flex: 1;
+  padding: 15px 6px;
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 10px;
+  background: rgba(0,212,255,0.03);
+  color: rgba(0,212,255,0.5);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* İZİN EKRANI */
+#permScreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 32px;
+}
+
+.p-icon { font-size: 52px; }
+
+.p-title {
+  font-family: var(--mono);
+  font-size: 20px;
+  letter-spacing: 6px;
+  color: var(--green);
+  text-shadow: 0 0 16px var(--green);
+}
+
+.p-desc {
+  font-size: 13px;
+  color: rgba(255,255,255,0.35);
+  text-align: center;
+  line-height: 1.8;
+  max-width: 280px;
+}
+
+.p-warn {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: rgba(255,214,0,0.4);
+  text-align: center;
+  line-height: 1.7;
+  max-width: 280px;
+  letter-spacing: 0.5px;
+}
+
+.p-btn {
+  width: 100%;
+  max-width: 280px;
+  padding: 17px;
+  border: 1px solid var(--green);
+  border-radius: 12px;
+  background: rgba(0,255,136,0.07);
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 3px;
+  cursor: pointer;
+  text-shadow: 0 0 10px var(--green);
+}
+</style>
+</head>
+<body>
+
+<!-- İZİN -->
+<div id="permScreen">
+  <div class="p-icon">〰️</div>
+  <div class="p-title">SONAR</div>
+  <div class="p-desc">Hoparlörden görünmez ultrasonik dalga yayar, mikrofon yansımayı analiz eder. Hareketi, yönü ve alanı tespit eder.</div>
+  <div class="p-warn">⚠ Kulaklık takma<br>Hoparlör sesi duyulmaz (19kHz)<br>Mikrofon + hoparlör izni gerekiyor</div>
+  <button class="p-btn" onclick="init()">[ SONARI AKTİF ET ]</button>
+</div>
+
+<!-- CANVAS -->
+<canvas id="bgCanvas"></canvas>
+<canvas id="uiCanvas"></canvas>
+
+<!-- ALERT OVERLAY -->
+<div id="alertOverlay">
+  <div class="alert-bg"></div>
+  <div class="alert-main">
+    <div class="alert-label">HAREKET TESPİT EDİLDİ</div>
+    <div class="alert-direction" id="alertDir">ÖN</div>
+    <div class="alert-size" id="alertSize">ORTA BOYUT</div>
+    <div class="alert-meter" id="alertMeter">MESAFE: YAKIN</div>
+  </div>
+</div>
+
+<!-- BORDER ALERTS -->
+<div class="border-alert ba-top" id="baTop"></div>
+<div class="border-alert ba-bottom" id="baBottom"></div>
+<div class="border-alert ba-left" id="baLeft"></div>
+<div class="border-alert ba-right" id="baRight"></div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <div class="brand">SONAR</div>
+    <div class="brand-sub">YÖN + ALAN TESPİTİ</div>
+  </div>
+  <div class="hdr-stats">
+    <div class="hdr-line">DURUM: <b id="statusTxt">HAZIR</b></div>
+    <div class="hdr-line">TESPİT: <b id="detTxt">0</b></div>
+    <div class="hdr-line">HASSAS: <b id="sensTxt">ORTA</b></div>
+  </div>
+</div>
+
+<!-- BOTTOM -->
+<div class="bottom">
+  <div class="status-bar">
+    <div class="stat-chip">
+      <div class="sc-label">YÖN</div>
+      <div class="sc-val" id="dirChip" style="font-size:11px">--</div>
+    </div>
+    <div class="stat-chip">
+      <div class="sc-label">MESAFE</div>
+      <div class="sc-val" id="distChip" style="font-size:10px">--</div>
+    </div>
+    <div class="stat-chip">
+      <div class="sc-label">BOYUT</div>
+      <div class="sc-val" id="sizeChip" style="font-size:10px">--</div>
+    </div>
+    <div class="stat-chip">
+      <div class="sc-label">ŞİDDET</div>
+      <div class="sc-val" id="intensChip">0</div>
+    </div>
+  </div>
+
+  <div class="log" id="logEl">
+    <div class="log-line ok">[ SİSTEM HAZIR ]</div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-main" id="mainBtn" onclick="toggleSonar()">[ BAŞLAT ]</button>
+    <button class="btn-sm" onclick="calibrate()">KALİBRE</button>
+    <button class="btn-sm" onclick="cycleSens()">HASSASİYET</button>
+  </div>
+</div>
+
+<script>
+const W = window.innerWidth, H = window.innerHeight;
+const bgC = document.getElementById('bgCanvas');
+const uiC = document.getElementById('uiCanvas');
+bgC.width = uiC.width = W;
+bgC.height = uiC.height = H;
+const bgX = bgC.getContext('2d');
+const uiX = uiC.getContext('2d');
+
+// STATE
+let audioCtx, analyser, oscillator, gainNode, micStream;
+let freqData, timeData;
+let active = false;
+let baseline = null;
+let calibrating = false;
+let detCount = 0;
+let alertCooldown = 0;
+let t = 0;
+
+// Yön geçmişi (sol/sağ faz analizi için)
+let leftHistory = new Array(20).fill(0);
+let rightHistory = new Array(20).fill(0);
+let frontHistory = new Array(20).fill(0);
+
+// Tespit edilen nesneler (ekranda nokta olarak)
+let objects = [];
+
+// Hassasiyet
+const SENS = [
+  { name: 'DÜŞÜK',  th: 18 },
+  { name: 'ORTA',   th: 9  },
+  { name: 'YÜKSEK', th: 5  },
+  { name: 'MAX',    th: 2.5},
+];
+let sensIdx = 1;
+
+const SONAR_FREQ = 19200;
+
+// ── INIT ──
+async function init() {
+  document.getElementById('permScreen').style.display = 'none';
+
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+
+    oscillator = audioCtx.createOscillator();
+    gainNode = audioCtx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = SONAR_FREQ;
+    gainNode.gain.value = 0;
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.start();
+
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        sampleRate: 48000
+      }
+    });
+
+    const source = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 8192;
+    analyser.smoothingTimeConstant = 0.2;
+    source.connect(analyser);
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    timeData = new Uint8Array(analyser.fftSize);
+
+    document.getElementById('statusTxt').textContent = 'AKTİF';
+    addLog('SİSTEM AKTİF · 19.2kHz', 'ok');
+
+    // İvmeölçer
+    if (window.DeviceMotionEvent) {
+      if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        try { await DeviceMotionEvent.requestPermission(); } catch(e) {}
+      }
+      window.addEventListener('devicemotion', onMotion, { passive: true });
+    }
+
+    drawBg();
+    loop();
+
+  } catch(e) {
+    addLog('HATA: ' + e.message, 'alert');
+  }
+}
+
+// İVMEÖLÇER
+let accel = { x:0, y:0, z:0 };
+let accelBase = { x:0, y:0, z:9.8 };
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity || {};
+  accel = { x: a.x||0, y: a.y||0, z: a.z||0 };
+}
+
+// ── SONAR ──
+function toggleSonar() {
+  active = !active;
+  const btn = document.getElementById('mainBtn');
+  if (active) {
+    gainNode.gain.setTargetAtTime(0.35, audioCtx.currentTime, 0.1);
+    btn.classList.add('active');
+    btn.textContent = '[ SONAR AKTİF · DURDUR ]';
+    document.getElementById('statusTxt').textContent = 'YAYIN';
+    addLog('SONAR BAŞLADI', 'ok');
+    setTimeout(() => { if (active && !baseline) calibrate(); }, 1500);
+  } else {
+    gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+    btn.classList.remove('active');
+    btn.textContent = '[ BAŞLAT ]';
+    document.getElementById('statusTxt').textContent = 'DURAKLATILDI';
+    addLog('SONAR DURDURULDU', 'warn');
+    objects = [];
+  }
+}
+
+function calibrate() {
+  if (!analyser || calibrating) return;
+  calibrating = true;
+  const samples = [];
+  addLog('KALİBRASYON: HAREKETSIZ KAL...', 'warn');
+
+  // Accel baseline
+  accelBase = { ...accel };
+
+  let cnt = 0;
+  const iv = setInterval(() => {
+    analyser.getByteFrequencyData(freqData);
+    const bin = getSonarBin();
+    let sum = 0;
+    for (let i = bin-8; i <= bin+8; i++) {
+      if (i >= 0 && i < freqData.length) sum += freqData[i];
+    }
+    samples.push(sum / 17);
+    cnt++;
+    if (cnt >= 40) {
+      clearInterval(iv);
+      baseline = samples.reduce((a,b)=>a+b,0)/samples.length;
+      calibrating = false;
+      addLog(`KALİBRASYON TAMAM · ${baseline.toFixed(1)}`, 'ok');
+    }
+  }, 75);
+}
+
+function cycleSens() {
+  sensIdx = (sensIdx+1) % SENS.length;
+  document.getElementById('sensTxt').textContent = SENS[sensIdx].name;
+  addLog(`HASSASİYET: ${SENS[sensIdx].name}`, 'warn');
+}
+
+function getSonarBin() {
+  if (!audioCtx) return 0;
+  return Math.round(SONAR_FREQ / (audioCtx.sampleRate/2) * analyser.frequencyBinCount);
+}
+
+// ── ANALİZ ──
+let prevBinVal = 0;
+let directionBuffer = [];
+let sizeBuffer = [];
+
+function analyze() {
+  if (!analyser || !active || !baseline || calibrating) return;
+
+  analyser.getByteFrequencyData(freqData);
+  analyser.getByteTimeDomainData(timeData);
+
+  const bin = getSonarBin();
+  const winSize = 10;
+
+  // Sonar frekansı etrafındaki güç
+  let sumCenter = 0, sumLow = 0, sumHigh = 0;
+  for (let i = bin-winSize; i <= bin+winSize; i++) {
+    if (i < 0 || i >= freqData.length) continue;
+    const v = freqData[i];
+    const dist = Math.abs(i - bin);
+    if (dist <= 3) sumCenter += v;
+    else if (i < bin) sumLow += v;
+    else sumHigh += v;
+  }
+
+  const centerAvg = sumCenter / 7;
+  const deviation = baseline > 0 ? Math.abs(centerAvg - baseline) / baseline * 100 : 0;
+
+  // Şiddet güncelle
+  document.getElementById('intensChip').textContent = deviation.toFixed(0);
+
+  const thresh = SENS[sensIdx].th;
+
+  if (deviation > thresh) {
+    // YÖN TAHMİNİ
+    // Yüksek frekans kayması = nesne yaklaşıyor (Doppler etkisi)
+    // Düşük frekans kayması = nesne uzaklaşıyor
+    const freqShift = sumHigh - sumLow;
+    const timeDomainVariance = calcVariance(timeData);
+
+    // Sol/sağ: zaman domain asimetrisi
+    let leftSum = 0, rightSum = 0;
+    for (let i = 0; i < timeData.length/2; i++) leftSum += Math.abs(timeData[i] - 128);
+    for (let i = timeData.length/2; i < timeData.length; i++) rightSum += Math.abs(timeData[i] - 128);
+
+    leftHistory.shift(); leftHistory.push(leftSum);
+    rightHistory.shift(); rightHistory.push(rightSum);
+    frontHistory.shift(); frontHistory.push(deviation);
+
+    const leftAvg = leftHistory.reduce((a,b)=>a+b,0)/leftHistory.length;
+    const rightAvg = rightHistory.reduce((a,b)=>a+b,0)/rightHistory.length;
+    const frontAvg = frontHistory.reduce((a,b)=>a+b,0)/frontHistory.length;
+
+    // İvmeölçer yön katkısı
+    const accelX = accel.x - (accelBase.x || 0);
+    const accelY = accel.y - (accelBase.y || 0);
+
+    let direction = 'ÖN';
+    const diff = leftAvg - rightAvg;
+
+    if (Math.abs(accelX) > 1.5) {
+      direction = accelX > 0 ? 'SAĞ' : 'SOL';
+    } else if (Math.abs(diff) > leftAvg * 0.15) {
+      direction = diff > 0 ? 'SOL' : 'SAĞ';
+    } else if (freqShift > 200) {
+      direction = 'YAKINLAŞIYOR';
+    } else if (freqShift < -200) {
+      direction = 'UZAKLAŞIYOR';
+    } else {
+      direction = 'ÖN';
+    }
+
+    directionBuffer.push(direction);
+    if (directionBuffer.length > 5) directionBuffer.shift();
+
+    // En sık yön
+    const finalDir = mostFrequent(directionBuffer);
+
+    // MESAFE (sapma oranına göre)
+    let dist, distLabel;
+    if (deviation > thresh * 8) { dist = 0.3; distLabel = 'ÇOK YAKIN'; }
+    else if (deviation > thresh * 4) { dist = 1.0; distLabel = 'YAKIN'; }
+    else if (deviation > thresh * 2) { dist = 2.5; distLabel = 'ORTA'; }
+    else { dist = 4.0; distLabel = 'UZAK'; }
+
+    // BOYUT (hareket genişliğine göre)
+    const spreadRatio = Math.abs(diff) / Math.max(leftAvg, rightAvg);
+    let sizeLabel;
+    sizeBuffer.push(deviation);
+    if (sizeBuffer.length > 10) sizeBuffer.shift();
+    const avgDev = sizeBuffer.reduce((a,b)=>a+b,0)/sizeBuffer.length;
+
+    if (avgDev > thresh * 6) sizeLabel = 'BÜYÜK';
+    else if (avgDev > thresh * 3) sizeLabel = 'ORTA';
+    else sizeLabel = 'KÜÇÜK';
+
+    // UI güncelle
+    document.getElementById('dirChip').textContent = finalDir;
+    document.getElementById('distChip').textContent = distLabel;
+    document.getElementById('sizeChip').textContent = sizeLabel;
+
+    // NESNE KONUMU (ekranda)
+    updateObjectPosition(finalDir, dist, sizeLabel, deviation);
+
+    // ALARM
+    if (alertCooldown <= 0) {
+      triggerAlert(finalDir, distLabel, sizeLabel);
+      alertCooldown = 20;
+      detCount++;
+      document.getElementById('detTxt').textContent = detCount;
+      addLog(`⚠ ${finalDir} · ${distLabel} · ${sizeLabel}`, 'alert');
+    }
+  } else {
+    // Sakin — nesneleri yavaşça sil
+    objects.forEach(o => o.alpha *= 0.95);
+    objects = objects.filter(o => o.alpha > 0.02);
+    document.getElementById('dirChip').textContent = '--';
+    document.getElementById('distChip').textContent = '--';
+    document.getElementById('sizeChip').textContent = '--';
+  }
+
+  if (alertCooldown > 0) {
+    alertCooldown--;
+    if (alertCooldown === 0) {
+      document.getElementById('alertOverlay').classList.remove('show');
+      ['baTop','baBottom','baLeft','baRight'].forEach(id => {
+        document.getElementById(id).classList.remove('show');
+      });
+    }
+  }
+}
+
+function calcVariance(arr) {
+  const mean = arr.reduce((a,b)=>a+b,0)/arr.length;
+  return arr.reduce((a,b)=>a+(b-mean)**2,0)/arr.length;
+}
+
+function mostFrequent(arr) {
+  const counts = {};
+  arr.forEach(v => counts[v] = (counts[v]||0)+1);
+  return Object.keys(counts).reduce((a,b) => counts[a]>counts[b]?a:b, arr[0]);
+}
+
+// NESNE KONUMU GÜNCELLE
+function updateObjectPosition(dir, dist, size, intensity) {
+  const cx = W/2, cy = H/2;
+  const maxR = Math.min(W,H)*0.35;
+  const r = (dist/5) * maxR;
+
+  let ox = cx, oy = cy;
+  if (dir === 'SOL') { ox = cx - r; oy = cy + (Math.random()-0.5)*40; }
+  else if (dir === 'SAĞ') { ox = cx + r; oy = cy + (Math.random()-0.5)*40; }
+  else if (dir === 'YAKINLAŞIYOR') { ox = cx; oy = cy - r*0.5; }
+  else if (dir === 'UZAKLAŞIYOR') { ox = cx; oy = cy + r*0.5; }
+  else { ox = cx + (Math.random()-0.5)*60; oy = cy - r*0.3; }
+
+  const objR = size === 'BÜYÜK' ? 28 : size === 'ORTA' ? 18 : 10;
+
+  // Mevcut nesneyi güncelle veya yeni ekle
+  if (objects.length > 0) {
+    objects[0] = { x: ox, y: oy, r: objR, intensity, alpha: 1, dir };
+  } else {
+    objects.push({ x: ox, y: oy, r: objR, intensity, alpha: 1, dir });
+  }
+}
+
+// ALARM TETİKLE
+function triggerAlert(dir, dist, size) {
+  document.getElementById('alertDir').textContent = dir;
+  document.getElementById('alertSize').textContent = size + ' BOYUT';
+  document.getElementById('alertMeter').textContent = 'MESAFE: ' + dist;
+  document.getElementById('alertOverlay').classList.add('show');
+
+  // Border
+  if (dir === 'SOL') document.getElementById('baLeft').classList.add('show');
+  else if (dir === 'SAĞ') document.getElementById('baRight').classList.add('show');
+  else if (dir === 'YAKINLAŞIYOR') document.getElementById('baTop').classList.add('show');
+  else {
+    document.getElementById('baTop').classList.add('show');
+    document.getElementById('baBottom').classList.add('show');
+  }
+
+  // Titreşim
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+  setTimeout(() => {
+    document.getElementById('alertOverlay').classList.remove('show');
+    ['baTop','baBottom','baLeft','baRight'].forEach(id => {
+      document.getElementById(id).classList.remove('show');
+    });
+  }, 1500);
+}
+
+// LOG
+function addLog(msg, type='ok') {
+  const el = document.getElementById('logEl');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + type;
+  const time = new Date().toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  line.textContent = `[${time}] ${msg}`;
+  el.insertBefore(line, el.firstChild);
+  while (el.children.length > 2) el.removeChild(el.lastChild);
+}
+
+// ── ÇIZIM ──
+function drawBg() {
+  bgX.clearRect(0,0,W,H);
+  bgX.strokeStyle = 'rgba(0,255,136,0.025)';
+  bgX.lineWidth = 0.5;
+  for (let x=0; x<W; x+=28) { bgX.beginPath(); bgX.moveTo(x,0); bgX.lineTo(x,H); bgX.stroke(); }
+  for (let y=0; y<H; y+=28) { bgX.beginPath(); bgX.moveTo(0,y); bgX.lineTo(W,y); bgX.stroke(); }
+}
+
+function loop() {
+  t++;
+  uiX.clearRect(0,0,W,H);
+  drawRadar();
+  drawObjects();
+  if (t % 3 === 0) analyze();
+  requestAnimationFrame(loop);
+}
+
+function drawRadar() {
+  const cx = W/2, cy = H/2;
+
+  // Çemberler
+  [55, 100, 150, 200].forEach((r,i) => {
+    uiX.beginPath();
+    uiX.arc(cx, cy, r, 0, Math.PI*2);
+    uiX.strokeStyle = `rgba(0,255,136,${0.04+i*0.01})`;
+    uiX.lineWidth = 0.5;
+    uiX.setLineDash([3,8]);
+    uiX.stroke();
+    uiX.setLineDash([]);
+  });
+
+  // Çapraz
+  uiX.strokeStyle = 'rgba(0,255,136,0.04)';
+  uiX.lineWidth = 0.5;
+  uiX.beginPath(); uiX.moveTo(cx-210,cy); uiX.lineTo(cx+210,cy); uiX.stroke();
+  uiX.beginPath(); uiX.moveTo(cx,cy-210); uiX.lineTo(cx,cy+210); uiX.stroke();
+
+  // Yön etiketleri
+  uiX.fillStyle = 'rgba(0,255,136,0.2)';
+  uiX.font = '9px Share Tech Mono';
+  uiX.textAlign = 'center';
+  uiX.fillText('ÖN', cx, cy-185);
+  uiX.fillText('ARKA', cx, cy+195);
+  uiX.textAlign = 'left';
+  uiX.fillText('SOL', cx-195, cy+3);
+  uiX.textAlign = 'right';
+  uiX.fillText('SAĞ', cx+195, cy+3);
+  uiX.textAlign = 'left';
+
+  // Sweep
+  if (active) {
+    const sweepAngle = (t * 0.022) % (Math.PI*2);
+    for (let a = 0; a < Math.PI/1.5; a += 0.04) {
+      const angle = sweepAngle - a;
+      const alpha = ((Math.PI/1.5-a)/(Math.PI/1.5)) * 0.1;
+      uiX.beginPath();
+      uiX.moveTo(cx,cy);
+      uiX.arc(cx,cy,205,angle,angle+0.04);
+      uiX.closePath();
+      uiX.fillStyle = `rgba(0,255,136,${alpha})`;
+      uiX.fill();
+    }
+    uiX.beginPath();
+    uiX.moveTo(cx,cy);
+    uiX.lineTo(cx+Math.cos(sweepAngle)*205, cy+Math.sin(sweepAngle)*205);
+    uiX.strokeStyle = 'rgba(0,255,136,0.7)';
+    uiX.lineWidth = 1.5;
+    uiX.stroke();
+
+    // Dalga yayılımı
+    for (let i=0; i<3; i++) {
+      const phase = ((t*0.012)+i*0.33) % 1;
+      const r = phase * 210;
+      uiX.beginPath();
+      uiX.arc(cx,cy,r,0,Math.PI*2);
+      uiX.strokeStyle = `rgba(0,255,136,${(1-phase)*0.12})`;
+      uiX.lineWidth = 1;
+      uiX.stroke();
+    }
+  }
+
+  // Merkez
+  uiX.beginPath();
+  uiX.arc(cx,cy,5,0,Math.PI*2);
+  uiX.fillStyle = '#00FF88';
+  uiX.shadowColor = '#00FF88';
+  uiX.shadowBlur = 12;
+  uiX.fill();
+  uiX.shadowBlur = 0;
+}
+
+function drawObjects() {
+  objects.forEach(obj => {
+    if (obj.alpha <= 0) return;
+
+    const pulse = Math.sin(t * 0.15) * 0.3 + 0.7;
+
+    // Dış halka
+    uiX.beginPath();
+    uiX.arc(obj.x, obj.y, obj.r * 2.5, 0, Math.PI*2);
+    uiX.strokeStyle = `rgba(255,34,68,${obj.alpha * 0.2})`;
+    uiX.lineWidth = 1;
+    uiX.stroke();
+
+    // Orta halka
+    uiX.beginPath();
+    uiX.arc(obj.x, obj.y, obj.r * 1.5, 0, Math.PI*2);
+    uiX.strokeStyle = `rgba(255,34,68,${obj.alpha * 0.4})`;
+    uiX.lineWidth = 1.5;
+    uiX.stroke();
+
+    // Ana nokta (gradient)
+    const grad = uiX.createRadialGradient(obj.x, obj.y, 0, obj.x, obj.y, obj.r);
+    grad.addColorStop(0, `rgba(255,100,100,${obj.alpha * pulse})`);
+    grad.addColorStop(0.5, `rgba(255,34,68,${obj.alpha * pulse * 0.8})`);
+    grad.addColorStop(1, `rgba(255,34,68,0)`);
+
+    uiX.beginPath();
+    uiX.arc(obj.x, obj.y, obj.r, 0, Math.PI*2);
+    uiX.fillStyle = grad;
+    uiX.shadowColor = 'rgba(255,34,68,0.5)';
+    uiX.shadowBlur = 15;
+    uiX.fill();
+    uiX.shadowBlur = 0;
+
+    // Merkez nokta
+    uiX.beginPath();
+    uiX.arc(obj.x, obj.y, 3, 0, Math.PI*2);
+    uiX.fillStyle = `rgba(255,255,255,${obj.alpha})`;
+    uiX.fill();
+
+    // Etiket
+    uiX.fillStyle = `rgba(255,100,100,${obj.alpha * 0.8})`;
+    uiX.font = '700 9px Share Tech Mono';
+    uiX.textAlign = 'center';
+    uiX.fillText(obj.dir, obj.x, obj.y - obj.r - 8);
+    uiX.textAlign = 'left';
+
+    // Merkeze bağlantı çizgisi
+    const cx = W/2, cy = H/2;
+    uiX.beginPath();
+    uiX.moveTo(cx,cy);
+    uiX.lineTo(obj.x,obj.y);
+    uiX.strokeStyle = `rgba(255,34,68,${obj.alpha * 0.15})`;
+    uiX.lineWidth = 0.5;
+    uiX.setLineDash([4,8]);
+    uiX.stroke();
+    uiX.setLineDash([]);
+  });
+}
+</script>
+</body>
+</html>
