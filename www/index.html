@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SONAR</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #020408;
+  --green: #00FF88;
+  --cyan: #00D4FF;
+  --red: #FF2244;
+  --yellow: #FFD600;
+  --orange: #FF6D00;
+  --purple: #CC44FF;
+  --mono: 'Share Tech Mono', monospace;
+}
+html, body { width:100%; height:100%; background:var(--bg); font-family:var(--mono); overflow:hidden; color:rgba(0,255,136,0.7); }
+
+canvas { position:fixed; inset:0; z-index:0; }
+#uiC { z-index:1; pointer-events:none; }
+
+/* HEADER */
+.hdr {
+  position:fixed; top:0; left:0; right:0;
+  padding:44px 16px 10px;
+  z-index:10;
+  background:linear-gradient(180deg,rgba(2,4,8,0.97) 0%,transparent 100%);
+  display:flex; align-items:flex-start; justify-content:space-between;
+  pointer-events:all;
+}
+.brand { font-size:18px; letter-spacing:5px; color:var(--green); text-shadow:0 0 14px var(--green); }
+.brand-sub { font-size:7px; color:rgba(0,255,136,0.3); letter-spacing:2px; margin-top:2px; }
+.hdr-r { text-align:right; display:flex; flex-direction:column; gap:2px; }
+.hl { font-size:8px; color:rgba(0,255,136,0.35); letter-spacing:1px; }
+.hl b { color:var(--green); }
+
+/* KISI SAYISI - büyük gösterim */
+.person-count {
+  position:fixed;
+  top:110px; left:50%; transform:translateX(-50%);
+  z-index:10;
+  text-align:center;
+  pointer-events:none;
+}
+.pc-num {
+  font-size:64px; font-weight:900;
+  line-height:1;
+  color:var(--red);
+  text-shadow:0 0 30px var(--red);
+  transition:all 0.3s;
+}
+.pc-num.zero { color:rgba(0,255,136,0.2); text-shadow:none; font-size:40px; }
+.pc-label { font-size:9px; letter-spacing:3px; color:rgba(255,34,68,0.5); margin-top:2px; }
+
+/* ALERT OVERLAY */
+#alertOv {
+  position:fixed; inset:0; z-index:20;
+  display:none; flex-direction:column;
+  align-items:center; justify-content:center;
+  pointer-events:none;
+}
+#alertOv.show { display:flex; }
+.av-bg { position:absolute; inset:0; background:rgba(255,34,68,0.07); animation:af 0.4s infinite; }
+@keyframes af { 0%,100%{opacity:1} 50%{opacity:0} }
+.av-content { position:relative; z-index:2; text-align:center; }
+.av-dir { font-size:40px; color:var(--red); text-shadow:0 0 24px var(--red); letter-spacing:3px; }
+.av-info { font-size:12px; color:rgba(255,34,68,0.7); letter-spacing:2px; margin-top:4px; }
+
+/* BORDER FLASH */
+.bfl { position:fixed; z-index:15; pointer-events:none; opacity:0; transition:opacity 0.2s; }
+.bfl.show { opacity:1; animation:bfp 0.3s infinite; }
+@keyframes bfp { 0%,100%{opacity:1} 50%{opacity:0.3} }
+#bTop,.bBottom { left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--red),transparent); }
+#bTop { top:0; } #bBot { bottom:0; }
+#bLeft { top:0;bottom:0;left:0;width:3px;background:linear-gradient(180deg,transparent,var(--red),transparent); }
+#bRight { top:0;bottom:0;right:0;width:3px;background:linear-gradient(180deg,transparent,var(--red),transparent); }
+
+/* GEÇMİŞ ŞERİDİ */
+#historyBar {
+  position:fixed; bottom:175px; left:0; right:0;
+  height:40px; z-index:10; pointer-events:none;
+  padding:0 16px;
+}
+#histCanvas { width:100%; height:40px; }
+
+/* ALT */
+.bottom {
+  position:fixed; bottom:0; left:0; right:0;
+  padding:0 14px 24px; z-index:10;
+  background:linear-gradient(0deg,rgba(2,4,8,0.98) 0%,transparent 100%);
+  pointer-events:all;
+}
+
+.stat-row { display:flex; gap:5px; margin-bottom:6px; }
+.sc {
+  flex:1; padding:6px 3px;
+  border:1px solid rgba(0,255,136,0.1); border-radius:7px;
+  background:rgba(0,255,136,0.02);
+  display:flex; flex-direction:column; align-items:center; gap:1px;
+}
+.sc-l { font-size:7px; letter-spacing:1px; color:rgba(0,255,136,0.3); }
+.sc-v { font-size:13px; font-weight:700; color:var(--green); line-height:1; }
+
+.log { height:26px; overflow:hidden; margin-bottom:6px; }
+.ll { font-size:9px; color:rgba(0,255,136,0.35); letter-spacing:0.5px; line-height:1.7; }
+.ll.a { color:var(--red); }
+.ll.w { color:var(--yellow); }
+.ll.ok { color:var(--green); }
+
+.btn-row { display:flex; gap:6px; }
+.bm {
+  flex:2; padding:13px;
+  border:1px solid rgba(0,255,136,0.35); border-radius:9px;
+  background:rgba(0,255,136,0.04); color:var(--green);
+  font-family:var(--mono); font-size:11px; letter-spacing:2px; cursor:pointer;
+  text-shadow:0 0 8px var(--green); transition:all 0.2s;
+}
+.bm.active { background:rgba(0,255,136,0.1); border-color:var(--green); box-shadow:0 0 20px rgba(0,255,136,0.1); }
+.bs {
+  flex:1; padding:13px 4px;
+  border:1px solid rgba(0,212,255,0.2); border-radius:9px;
+  background:rgba(0,212,255,0.03); color:rgba(0,212,255,0.5);
+  font-family:var(--mono); font-size:8px; letter-spacing:1px; cursor:pointer; transition:all 0.2s;
+}
+.bs.active { background:rgba(0,212,255,0.08); border-color:var(--cyan); color:var(--cyan); }
+
+/* İZİN */
+#perm {
+  position:fixed; inset:0; z-index:100; background:var(--bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:14px; padding:40px 32px;
+}
+.pi { font-size:50px; }
+.pt { font-size:18px; letter-spacing:6px; color:var(--green); text-shadow:0 0 14px var(--green); }
+.pd { font-size:12px; color:rgba(255,255,255,0.3); text-align:center; line-height:1.8; max-width:270px; }
+.pw { font-size:9px; color:rgba(255,214,0,0.4); text-align:center; line-height:1.7; max-width:270px; letter-spacing:0.5px; }
+.pb {
+  width:100%; max-width:270px; padding:15px;
+  border:1px solid var(--green); border-radius:11px;
+  background:rgba(0,255,136,0.07); color:var(--green);
+  font-family:var(--mono); font-size:13px; letter-spacing:3px; cursor:pointer;
+  text-shadow:0 0 10px var(--green);
+}
+</style>
+</head>
+<body>
+
+<div id="perm">
+  <div class="pi">〰️</div>
+  <div class="pt">SONAR</div>
+  <div class="pd">Ultrasonik dalga yayar, yansımayı analiz eder. Çoklu hedef, yol takibi, sesli alarm.</div>
+  <div class="pw">⚠ Kulaklık takma · Hoparlör + Mikrofon izni</div>
+  <button class="pb" onclick="init()">[ AKTİF ET ]</button>
+</div>
+
+<canvas id="bgC"></canvas>
+<canvas id="uiC"></canvas>
+
+<div id="alertOv">
+  <div class="av-bg"></div>
+  <div class="av-content">
+    <div class="av-dir" id="avDir">ÖN</div>
+    <div class="av-info" id="avInfo">YAKIN · ORTA</div>
+  </div>
+</div>
+
+<div class="bfl" id="bTop" style="top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--red),transparent)"></div>
+<div class="bfl" id="bBot" style="bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--red),transparent)"></div>
+<div class="bfl" id="bLeft" style="top:0;bottom:0;left:0;width:3px;background:linear-gradient(180deg,transparent,var(--red),transparent)"></div>
+<div class="bfl" id="bRight" style="top:0;bottom:0;right:0;width:3px;background:linear-gradient(180deg,transparent,var(--red),transparent)"></div>
+
+<div class="hdr">
+  <div>
+    <div class="brand">SONAR</div>
+    <div class="brand-sub">v3 · ÇOK HEDEF · YOL TAKİBİ</div>
+  </div>
+  <div class="hdr-r">
+    <div class="hl">DURUM: <b id="stTxt">HAZIR</b></div>
+    <div class="hl">TOPLAM: <b id="detTxt">0</b></div>
+    <div class="hl">HASSAS: <b id="sensTxt">ORTA</b></div>
+  </div>
+</div>
+
+<div class="person-count">
+  <div class="pc-num zero" id="pcNum">0</div>
+  <div class="pc-label" id="pcLabel">KİŞİ YOK</div>
+</div>
+
+<div id="historyBar">
+  <canvas id="histCanvas"></canvas>
+</div>
+
+<div class="bottom">
+  <div class="stat-row">
+    <div class="sc"><div class="sc-l">YÖN</div><div class="sc-v" id="dirC" style="font-size:10px">--</div></div>
+    <div class="sc"><div class="sc-l">MESAFE</div><div class="sc-v" id="distC" style="font-size:9px">--</div></div>
+    <div class="sc"><div class="sc-l">BOYUT</div><div class="sc-v" id="sizeC" style="font-size:9px">--</div></div>
+    <div class="sc"><div class="sc-l">ŞİDDET</div><div class="sc-v" id="intC">0</div></div>
+    <div class="sc"><div class="sc-l">KİŞİ</div><div class="sc-v" id="pplC" style="color:var(--red)">0</div></div>
+  </div>
+  <div class="log" id="logEl"><div class="ll ok">[ SİSTEM HAZIR ]</div></div>
+  <div class="btn-row">
+    <button class="bm" id="mainBtn" onclick="toggleSonar()">[ BAŞLAT ]</button>
+    <button class="bs" onclick="calibrate()">KALİBRE</button>
+    <button class="bs" onclick="cycleSens()">HASSAS</button>
+    <button class="bs" id="sndBtn" onclick="toggleSound()">SES: OFF</button>
+  </div>
+</div>
+
+<script>
+const W = window.innerWidth, H = window.innerHeight;
+['bgC','uiC'].forEach(id => { const c=document.getElementById(id); c.width=W; c.height=H; });
+const bgX = document.getElementById('bgC').getContext('2d');
+const uiX = document.getElementById('uiC').getContext('2d');
+const hC = document.getElementById('histCanvas');
+hC.width = window.innerWidth - 32;
+hC.height = 40;
+const hX = hC.getContext('2d');
+
+// STATE
+let audioCtx, analyser, oscillator, gainNode, micStream, alarmOsc;
+let freqData, timeData;
+let active = false, baseline = null, calibrating = false;
+let detCount = 0, t = 0, alertCD = 0;
+let soundOn = false;
+
+// Nesneler (çoklu hedef)
+let objects = [];
+// Yol geçmişi
+let trails = {};
+let trailId = 0;
+
+// Geçmiş (60 sn)
+const HIST_LEN = 300; // 300 frame ~ 60sn
+const histData = new Array(HIST_LEN).fill(0);
+
+// Kişi sayısı tahmini
+let personCount = 0;
+let personHistory = new Array(10).fill(0);
+
+const SENS = [
+  {name:'DÜŞÜK', th:20},
+  {name:'ORTA',  th:9 },
+  {name:'YÜKSEK',th:4 },
+  {name:'MAX',   th:2 },
+];
+let sensIdx = 1;
+
+const SONAR_FREQ = 19200;
+const COLORS = ['#FF2244','#FF6D00','#CC44FF','#00D4FF','#FFD600'];
+
+// ── INIT ──
+async function init() {
+  document.getElementById('perm').style.display = 'none';
+  try {
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000});
+
+    oscillator = audioCtx.createOscillator();
+    gainNode = audioCtx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = SONAR_FREQ;
+    gainNode.gain.value = 0;
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.start();
+
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,sampleRate:48000}
+    });
+    const src = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 8192;
+    analyser.smoothingTimeConstant = 0.2;
+    src.connect(analyser);
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    timeData = new Uint8Array(analyser.fftSize);
+
+    document.getElementById('stTxt').textContent = 'AKTİF';
+    addLog('SİSTEM AKTİF', 'ok');
+
+    if (window.DeviceMotionEvent) {
+      if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        try { await DeviceMotionEvent.requestPermission(); } catch(e){}
+      }
+      window.addEventListener('devicemotion', e => {
+        const a = e.accelerationIncludingGravity||{};
+        accel = {x:a.x||0,y:a.y||0,z:a.z||0};
+      }, {passive:true});
+    }
+
+    drawBg();
+    loop();
+  } catch(e) { addLog('HATA: '+e.message,'a'); }
+}
+
+let accel = {x:0,y:0,z:0}, accelBase = {x:0,y:0,z:9.8};
+
+function toggleSonar() {
+  active = !active;
+  const btn = document.getElementById('mainBtn');
+  if (active) {
+    gainNode.gain.setTargetAtTime(0.35, audioCtx.currentTime, 0.1);
+    btn.classList.add('active');
+    btn.textContent = '[ SONAR AKTİF · DUR ]';
+    document.getElementById('stTxt').textContent = 'YAYIN';
+    addLog('SONAR BAŞLADI','ok');
+    setTimeout(()=>{ if(active&&!baseline) calibrate(); },1500);
+  } else {
+    gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+    btn.classList.remove('active');
+    btn.textContent = '[ BAŞLAT ]';
+    document.getElementById('stTxt').textContent = 'DURAKLATILDI';
+    objects = []; trails = {};
+    updatePersonCount(0);
+    addLog('SONAR DURDURULDU','w');
+  }
+}
+
+function calibrate() {
+  if (!analyser||calibrating) return;
+  calibrating = true;
+  accelBase = {...accel};
+  const samples = [];
+  addLog('KALİBRASYON...','w');
+  let cnt = 0;
+  const iv = setInterval(()=>{
+    analyser.getByteFrequencyData(freqData);
+    const bin = getSonarBin();
+    let s=0; for(let i=bin-8;i<=bin+8;i++) if(i>=0&&i<freqData.length) s+=freqData[i];
+    samples.push(s/17);
+    if(++cnt>=40){
+      clearInterval(iv);
+      baseline = samples.reduce((a,b)=>a+b,0)/samples.length;
+      calibrating = false;
+      addLog(`TAMAM · BAZA:${baseline.toFixed(0)}`,'ok');
+    }
+  },75);
+}
+
+function cycleSens() {
+  sensIdx = (sensIdx+1)%SENS.length;
+  document.getElementById('sensTxt').textContent = SENS[sensIdx].name;
+  addLog('HASSAS: '+SENS[sensIdx].name,'w');
+}
+
+function toggleSound() {
+  soundOn = !soundOn;
+  document.getElementById('sndBtn').textContent = soundOn ? 'SES: ON' : 'SES: OFF';
+  document.getElementById('sndBtn').classList.toggle('active', soundOn);
+}
+
+function getSonarBin() {
+  if(!audioCtx) return 0;
+  return Math.round(SONAR_FREQ/(audioCtx.sampleRate/2)*analyser.frequencyBinCount);
+}
+
+// ── ANALİZ ──
+let leftH=new Array(20).fill(0), rightH=new Array(20).fill(0);
+let dirBuf=[], prevDev=0, multiDetectBuf=[];
+
+function analyze() {
+  if(!analyser||!active||!baseline||calibrating) return;
+  analyser.getByteFrequencyData(freqData);
+  analyser.getByteTimeDomainData(timeData);
+
+  const bin = getSonarBin();
+  let sumC=0, sumL=0, sumH2=0;
+  for(let i=bin-10;i<=bin+10;i++){
+    if(i<0||i>=freqData.length) continue;
+    const v=freqData[i], d=Math.abs(i-bin);
+    if(d<=3) sumC+=v; else if(i<bin) sumL+=v; else sumH2+=v;
+  }
+  const avgC = sumC/7;
+  const dev = baseline>0 ? Math.abs(avgC-baseline)/baseline*100 : 0;
+
+  // Geçmiş güncelle
+  histData.shift(); histData.push(dev);
+
+  document.getElementById('intC').textContent = dev.toFixed(0);
+
+  const th = SENS[sensIdx].th;
+
+  // Kişi sayısı tahmini — sapma büyüklüğü ve varyansına göre
+  const histVariance = calcVar(histData.slice(-30));
+  let estimatedPersons = 0;
+  if (dev > th) {
+    if (dev > th*8) estimatedPersons = 3;
+    else if (dev > th*4) estimatedPersons = 2;
+    else estimatedPersons = 1;
+  }
+  personHistory.shift(); personHistory.push(estimatedPersons);
+  const avgPersons = Math.round(personHistory.reduce((a,b)=>a+b,0)/personHistory.length);
+  updatePersonCount(avgPersons);
+
+  if (dev > th) {
+    // YÖN
+    let lS=0,rS=0;
+    for(let i=0;i<timeData.length/2;i++) lS+=Math.abs(timeData[i]-128);
+    for(let i=timeData.length/2;i<timeData.length;i++) rS+=Math.abs(timeData[i]-128);
+    leftH.shift(); leftH.push(lS);
+    rightH.shift(); rightH.push(rS);
+    const la=leftH.reduce((a,b)=>a+b,0)/leftH.length;
+    const ra=rightH.reduce((a,b)=>a+b,0)/rightH.length;
+    const freqShift = sumH2-sumL;
+    const acX = accel.x-(accelBase.x||0);
+
+    let dir = 'ÖN';
+    if(Math.abs(acX)>1.5) dir = acX>0?'SAĞ':'SOL';
+    else if(Math.abs(la-ra)>la*0.12) dir = la>ra?'SOL':'SAĞ';
+    else if(freqShift>150) dir='YAKINLAŞIYOR';
+    else if(freqShift<-150) dir='UZAKLAŞIYOR';
+
+    dirBuf.push(dir); if(dirBuf.length>6) dirBuf.shift();
+    const finalDir = modeOf(dirBuf);
+
+    // MESAFE
+    let distL = dev>th*8?'ÇOK YAKIN':dev>th*4?'YAKIN':dev>th*2?'ORTA':'UZAK';
+    let distNum = dev>th*8?0.3:dev>th*4?1:dev>th*2?2.5:4;
+
+    // BOYUT
+    let sizeL = dev>th*6?'BÜYÜK':dev>th*3?'ORTA':'KÜÇÜK';
+
+    document.getElementById('dirC').textContent = finalDir;
+    document.getElementById('distC').textContent = distL;
+    document.getElementById('sizeC').textContent = sizeL;
+
+    // Çoklu nesne oluştur
+    updateObjects(finalDir, distNum, sizeL, dev, avgPersons);
+
+    if(alertCD<=0) {
+      triggerAlert(finalDir, distL, sizeL, avgPersons);
+      alertCD = 20; detCount++;
+      document.getElementById('detTxt').textContent = detCount;
+      addLog(`⚠ ${finalDir} · ${distL} · ${avgPersons} KİŞİ`,'a');
+    }
+  } else {
+    // Yavaşça sil
+    objects.forEach(o=>o.alpha*=0.93);
+    objects=objects.filter(o=>o.alpha>0.01);
+    document.getElementById('dirC').textContent='--';
+    document.getElementById('distC').textContent='--';
+    document.getElementById('sizeC').textContent='--';
+  }
+
+  if(alertCD>0){
+    alertCD--;
+    if(alertCD===0){
+      document.getElementById('alertOv').classList.remove('show');
+      ['bTop','bBot','bLeft','bRight'].forEach(id=>document.getElementById(id).classList.remove('show'));
+    }
+  }
+
+  prevDev = dev;
+}
+
+function updatePersonCount(n) {
+  personCount = n;
+  const el = document.getElementById('pcNum');
+  const lbl = document.getElementById('pcLabel');
+  document.getElementById('pplC').textContent = n;
+  el.textContent = n;
+  if(n===0){
+    el.className='pc-num zero';
+    lbl.textContent='KİŞİ YOK';
+  } else {
+    el.className='pc-num';
+    el.style.color = n===1?'var(--yellow)':n===2?'var(--orange)':'var(--red)';
+    el.style.textShadow = `0 0 30px ${n===1?'var(--yellow)':n===2?'var(--orange)':'var(--red)'}`;
+    lbl.textContent = n===1?'1 KİŞİ TESPİT':n===2?'2 KİŞİ TESPİT':'3+ KİŞİ TESPİT';
+    lbl.style.color = n===1?'rgba(255,214,0,0.5)':n===2?'rgba(255,109,0,0.5)':'rgba(255,34,68,0.5)';
+  }
+}
+
+function updateObjects(dir, dist, size, dev, count) {
+  const cx=W/2, cy=H/2;
+  const maxR=Math.min(W,H)*0.32;
+  const r=(dist/5)*maxR;
+  const objR=size==='BÜYÜK'?30:size==='ORTA'?18:10;
+
+  const spread = count>1 ? 60 : 0;
+
+  // Temel konum
+  let bx=cx, by=cy;
+  if(dir==='SOL'){bx=cx-r;by=cy+(Math.random()-0.5)*30;}
+  else if(dir==='SAĞ'){bx=cx+r;by=cy+(Math.random()-0.5)*30;}
+  else if(dir==='YAKINLAŞIYOR'){bx=cx+(Math.random()-0.5)*40;by=cy-r*0.4;}
+  else if(dir==='UZAKLAŞIYOR'){bx=cx+(Math.random()-0.5)*40;by=cy+r*0.4;}
+  else{bx=cx+(Math.random()-0.5)*50;by=cy-r*0.3;}
+
+  // Nesne sayısına göre çoklu konum
+  const newObjs = [];
+  for(let i=0;i<Math.min(count,3);i++){
+    const angle = (i/(Math.max(count,1)))*Math.PI*2 - Math.PI/2;
+    const spread2 = count>1 ? 50 : 0;
+    const ox = bx + (count>1?Math.cos(angle)*spread2:0) + (Math.random()-0.5)*15;
+    const oy = by + (count>1?Math.sin(angle)*spread2*0.5:0) + (Math.random()-0.5)*15;
+
+    // Mevcut nesneyi bul veya yeni oluştur
+    if(objects[i]) {
+      // Yol iz ekle
+      if(!trails[i]) trails[i]=[];
+      trails[i].push({x:objects[i].x,y:objects[i].y,age:0});
+      if(trails[i].length>20) trails[i].shift();
+
+      objects[i].x = ox;
+      objects[i].y = oy;
+      objects[i].r = objR;
+      objects[i].alpha = 1;
+      objects[i].color = COLORS[i%COLORS.length];
+    } else {
+      objects.push({x:ox,y:oy,r:objR,alpha:1,color:COLORS[i%COLORS.length],dir});
+      trails[i]=[];
+    }
+  }
+
+  // Fazla nesneyi sil
+  while(objects.length>count) {
+    objects.pop();
+  }
+}
+
+function triggerAlert(dir, dist, size, count) {
+  document.getElementById('avDir').textContent = dir;
+  document.getElementById('avInfo').textContent = `${dist} · ${size} · ${count} KİŞİ`;
+  document.getElementById('alertOv').classList.add('show');
+
+  if(dir==='SOL') document.getElementById('bLeft').classList.add('show');
+  else if(dir==='SAĞ') document.getElementById('bRight').classList.add('show');
+  else if(dir==='YAKINLAŞIYOR'){document.getElementById('bTop').classList.add('show');}
+  else{document.getElementById('bTop').classList.add('show');document.getElementById('bBot').classList.add('show');}
+
+  if(navigator.vibrate) navigator.vibrate([80,40,80]);
+
+  // Sesli alarm
+  if(soundOn && audioCtx) {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.frequency.value = dir==='YAKINLAŞIYOR'?880:dir==='SOL'?660:dir==='SAĞ'?770:550;
+    osc.type='square';
+    g.gain.value=0.15;
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start();
+    setTimeout(()=>osc.stop(),200);
+  }
+
+  setTimeout(()=>{
+    document.getElementById('alertOv').classList.remove('show');
+    ['bTop','bBot','bLeft','bRight'].forEach(id=>document.getElementById(id).classList.remove('show'));
+  },1200);
+}
+
+function calcVar(arr) {
+  const m=arr.reduce((a,b)=>a+b,0)/arr.length;
+  return arr.reduce((a,b)=>a+(b-m)**2,0)/arr.length;
+}
+
+function modeOf(arr) {
+  const c={}; arr.forEach(v=>c[v]=(c[v]||0)+1);
+  return Object.keys(c).reduce((a,b)=>c[a]>c[b]?a:b,arr[0]);
+}
+
+function addLog(msg,type='ok') {
+  const el=document.getElementById('logEl');
+  const l=document.createElement('div');
+  l.className='ll '+type;
+  const tm=new Date().toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  l.textContent=`[${tm}] ${msg}`;
+  el.insertBefore(l,el.firstChild);
+  while(el.children.length>2) el.removeChild(el.lastChild);
+}
+
+// ── ÇİZİM ──
+function drawBg() {
+  bgX.strokeStyle='rgba(0,255,136,0.02)';
+  bgX.lineWidth=0.5;
+  for(let x=0;x<W;x+=28){bgX.beginPath();bgX.moveTo(x,0);bgX.lineTo(x,H);bgX.stroke();}
+  for(let y=0;y<H;y+=28){bgX.beginPath();bgX.moveTo(0,y);bgX.lineTo(W,y);bgX.stroke();}
+}
+
+function drawHistory() {
+  hX.clearRect(0,0,hC.width,40);
+  const bw=hC.width/HIST_LEN;
+  const th=SENS[sensIdx].th;
+  histData.forEach((v,i)=>{
+    const h=Math.min(38,(v/50)*38);
+    const triggered=v>th;
+    hX.fillStyle=triggered?`rgba(255,34,68,0.7)`:`rgba(0,255,136,0.25)`;
+    hX.fillRect(i*bw,40-h,Math.max(bw-0.5,1),h);
+  });
+  // Eşik çizgisi
+  const thH=Math.min(38,(th/50)*38);
+  hX.strokeStyle='rgba(255,214,0,0.3)';
+  hX.lineWidth=0.5;
+  hX.setLineDash([3,6]);
+  hX.beginPath();hX.moveTo(0,40-thH);hX.lineTo(hC.width,40-thH);hX.stroke();
+  hX.setLineDash([]);
+}
+
+function loop() {
+  t++;
+  uiX.clearRect(0,0,W,H);
+  drawRadar();
+  drawTrails();
+  drawObjects();
+  drawHistory();
+  if(t%3===0) analyze();
+  requestAnimationFrame(loop);
+}
+
+function drawRadar() {
+  const cx=W/2, cy=H/2;
+  [55,100,150,200].forEach((r,i)=>{
+    uiX.beginPath();uiX.arc(cx,cy,r,0,Math.PI*2);
+    uiX.strokeStyle=`rgba(0,255,136,${0.04+i*0.01})`;
+    uiX.lineWidth=0.5;uiX.setLineDash([3,8]);uiX.stroke();uiX.setLineDash([]);
+  });
+  uiX.strokeStyle='rgba(0,255,136,0.04)';uiX.lineWidth=0.5;
+  uiX.beginPath();uiX.moveTo(cx-210,cy);uiX.lineTo(cx+210,cy);uiX.stroke();
+  uiX.beginPath();uiX.moveTo(cx,cy-210);uiX.lineTo(cx,cy+210);uiX.stroke();
+
+  // Yön etiketleri
+  uiX.fillStyle='rgba(0,255,136,0.18)';uiX.font='8px Share Tech Mono';
+  uiX.textAlign='center';uiX.fillText('ÖN',cx,cy-185);uiX.fillText('ARKA',cx,cy+195);
+  uiX.textAlign='left';uiX.fillText('SOL',cx-195,cy+3);
+  uiX.textAlign='right';uiX.fillText('SAĞ',cx+195,cy+3);
+  uiX.textAlign='left';
+
+  if(!active) return;
+  const sw=(t*0.022)%(Math.PI*2);
+  for(let a=0;a<Math.PI/1.5;a+=0.04){
+    const ang=sw-a,al=((Math.PI/1.5-a)/(Math.PI/1.5))*0.1;
+    uiX.beginPath();uiX.moveTo(cx,cy);uiX.arc(cx,cy,205,ang,ang+0.04);uiX.closePath();
+    uiX.fillStyle=`rgba(0,255,136,${al})`;uiX.fill();
+  }
+  uiX.beginPath();uiX.moveTo(cx,cy);
+  uiX.lineTo(cx+Math.cos(sw)*205,cy+Math.sin(sw)*205);
+  uiX.strokeStyle='rgba(0,255,136,0.7)';uiX.lineWidth=1.5;uiX.stroke();
+
+  for(let i=0;i<3;i++){
+    const ph=((t*0.012)+i*0.33)%1,r=ph*210;
+    uiX.beginPath();uiX.arc(cx,cy,r,0,Math.PI*2);
+    uiX.strokeStyle=`rgba(0,255,136,${(1-ph)*0.1})`;uiX.lineWidth=1;uiX.stroke();
+  }
+
+  uiX.beginPath();uiX.arc(cx,cy,5,0,Math.PI*2);
+  uiX.fillStyle='#00FF88';uiX.shadowColor='#00FF88';uiX.shadowBlur=12;uiX.fill();uiX.shadowBlur=0;
+}
+
+function drawTrails() {
+  Object.keys(trails).forEach(id=>{
+    const trail=trails[id];
+    if(!trail||trail.length<2) return;
+    const color=COLORS[id%COLORS.length];
+    for(let i=1;i<trail.length;i++){
+      const alpha=(i/trail.length)*0.4;
+      uiX.beginPath();
+      uiX.moveTo(trail[i-1].x,trail[i-1].y);
+      uiX.lineTo(trail[i].x,trail[i].y);
+      uiX.strokeStyle=color.replace(')',`,${alpha})`).replace('rgb','rgba');
+      uiX.lineWidth=2;uiX.stroke();
+
+      // Nokta
+      uiX.beginPath();uiX.arc(trail[i].x,trail[i].y,2,0,Math.PI*2);
+      uiX.fillStyle=color.replace(')',`,${alpha*0.7})`).replace('rgb','rgba');
+      uiX.fill();
+    }
+  });
+}
+
+function drawObjects() {
+  objects.forEach((obj,i)=>{
+    if(obj.alpha<=0) return;
+    const p=Math.sin(t*0.15)*0.3+0.7;
+    const col=obj.color;
+
+    // Dış halkalar
+    [3,2].forEach((m,j)=>{
+      uiX.beginPath();uiX.arc(obj.x,obj.y,obj.r*m,0,Math.PI*2);
+      uiX.strokeStyle=`rgba(255,34,68,${obj.alpha*(0.1+j*0.1)})`;
+      uiX.lineWidth=1;uiX.stroke();
+    });
+
+    // Ana nokta
+    const g=uiX.createRadialGradient(obj.x,obj.y,0,obj.x,obj.y,obj.r);
+    g.addColorStop(0,`rgba(255,120,120,${obj.alpha*p})`);
+    g.addColorStop(0.5,`rgba(255,34,68,${obj.alpha*p*0.8})`);
+    g.addColorStop(1,'rgba(255,34,68,0)');
+    uiX.beginPath();uiX.arc(obj.x,obj.y,obj.r,0,Math.PI*2);
+    uiX.fillStyle=g;uiX.shadowColor='rgba(255,34,68,0.4)';uiX.shadowBlur=12;uiX.fill();uiX.shadowBlur=0;
+
+    // Merkez beyaz nokta
+    uiX.beginPath();uiX.arc(obj.x,obj.y,3,0,Math.PI*2);
+    uiX.fillStyle=`rgba(255,255,255,${obj.alpha})`;uiX.fill();
+
+    // Numara etiketi
+    uiX.fillStyle=`rgba(255,200,200,${obj.alpha*0.9})`;
+    uiX.font=`700 10px Share Tech Mono`;
+    uiX.textAlign='center';
+    uiX.fillText(`#${i+1}`,obj.x,obj.y-obj.r-10);
+    uiX.textAlign='left';
+
+    // Merkeze çizgi
+    uiX.beginPath();uiX.moveTo(W/2,H/2);uiX.lineTo(obj.x,obj.y);
+    uiX.strokeStyle=`rgba(255,34,68,${obj.alpha*0.12})`;
+    uiX.lineWidth=0.5;uiX.setLineDash([4,8]);uiX.stroke();uiX.setLineDash([]);
+  });
+}
+</script>
+</body>
+</html>

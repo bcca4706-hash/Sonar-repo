@@ -1,0 +1,8 @@
+{
+  "appId": "com.sonar.hareket",
+  "appName": "Sonar",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
